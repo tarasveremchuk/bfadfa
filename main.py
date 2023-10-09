@@ -115,31 +115,31 @@ def info(message):
 
 
     elif message.text == '📷 Відправити фото 📸':
+        hide_markup = types.ReplyKeyboardRemove()
+
         conn2 = sqlite3.connect('photos.db')
         cursor2 = conn2.cursor()
 
         cursor2.execute('''
-                                      CREATE TABLE IF NOT EXISTS photos (
-                                          id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                          user_id INTEGER,
-                                          file BLOB,
-                                          order_number INTEGER,
-                                          price INTEGER,
-                                          status INTEGER,
-                                          delivery TEXT,
-                                          date_order DATETIME,
-                                          nomer_ttn INTEGER,
-                                          nomer_card INTEGER,
-                                          price_status TEXT,
-                                          name_order TEXT,
-                                          asstimated_time INTEGER   
-                                      )
-                                  ''')
+                                              CREATE TABLE IF NOT EXISTS photos (
+                                                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                  user_id INTEGER,
+                                                  file BLOB,
+                                                  order_number INTEGER,
+                                                  price INTEGER,
+                                                  status INTEGER,
+                                                  delivery TEXT,
+                                                  date_order DATETIME,
+                                                  nomer_ttn INTEGER,
+                                                  nomer_card INTEGER,
+                                                  price_status TEXT,
+                                                  name_order TEXT,
+                                                  asstimated_time INTEGER   
+                                              )
+                                          ''')
         conn2.commit()
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         button2 = types.KeyboardButton('✅ Я відправив усі фото')
-        # markup.row(button2)
-        # markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         button3 = types.KeyboardButton('↩️ Назад до меню')
         markup.row(button2, button3)
         conn = sqlite3.connect('photos.db')
@@ -153,7 +153,11 @@ def info(message):
             last_order_number = 1
         else:
             last_order_number = int(result) + 1
-        sentPhotoChapter(message)
+            bot.send_message(message.chat.id, '''*‼️Придумай назву для замовлення.*
+
+        Наприклад:
+        Футболка червона Nike vintage L.''', parse_mode='Markdown', reply_markup=hide_markup)
+        bot.register_next_step_handler(message, sentPhotoChapter, last_order_number)
 
         @bot.message_handler(content_types=['photo'])
         def handle_photo(message):
@@ -161,27 +165,34 @@ def info(message):
             cursor = conn.cursor()
             # Створення таблиці для збереження фотографій
             cursor.execute('''
-                                   CREATE TABLE IF NOT EXISTS photos (
-                                       id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                       user_id INTEGER,
-                                       file BLOB,
-                                       order_number INTEGER,
-                                       price INTEGER,
-                                       status INTEGER,
-                                       delivery TEXT,
-                                       date_order DATETIME,
-                                       nomer_ttn INTEGER,
-                                       nomer_card INTEGER,
-                                       price_status TEXT,
-                                       name_order TEXT,
-                                       asstimated_time INTEGER
-                                   )
-                               ''')
+                                               CREATE TABLE IF NOT EXISTS photos (
+                                                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                   user_id INTEGER,
+                                                   file BLOB,
+                                                   order_number INTEGER,
+                                                   price INTEGER,
+                                                   status INTEGER,
+                                                   delivery TEXT,
+                                                   date_order DATETIME,
+                                                   nomer_ttn INTEGER,
+                                                   nomer_card INTEGER,
+                                                   price_status TEXT,
+                                                   name_order TEXT,
+                                                   asstimated_time INTEGER
+                                               )
+                                           ''')
             conn.commit()
+
+            user_id2 = message.from_user.id
+            name_order = get_name_order(user_id2, last_order_number)
             if message.photo:
-                # Отримання ідентифікатора користувача
                 user_id = message.from_user.id
 
+                # Оновлюємо номер замовлення
+                cursor.execute('SELECT name_order FROM photos WHERE user_id = ? AND order_number = ?',
+                               (user_id, last_order_number))
+                result = cursor.fetchone()[0]
+                # Отримання ідентифікатора користувача
 
                 # Отримання фотографії з повідомлення
                 photo = message.photo[-1]
@@ -198,23 +209,15 @@ def info(message):
                 status = 8  # Значення статусу 8
 
                 cursor.execute(
-                    'INSERT INTO photos (user_id, file, order_number, price, status, delivery, nomer_ttn,price_status) '
-                    'VALUES (?, ?, ?, ?, ?, ?,  ?,?)',
-                    (user_id, encoded_photo, last_order_number, None, status, None, None, None))
+                    'INSERT INTO photos (user_id, file, order_number, price, status, delivery, nomer_ttn,price_status,name_order) '
+                    'VALUES (?, ?, ?, ?, ?, ?,  ?,?,?)',
+                    (user_id, encoded_photo, last_order_number, None, status, None, None, None, result))
 
                 conn.commit()
 
-                order_message = f"Користувач @{message.from_user.username}  хоче продати річ\nНомер замовлення: {last_order_number}\n З ІД:"
-                bot.send_message(chat_id='-917631518', text=order_message)
-
-                order_message2 = f"{message.chat.id}"
-                bot.send_message(chat_id='-917631518', text=order_message2)
-
-                # Відправлення фотографії до групи
-                bot.send_photo(chat_id='-917631518', photo=photo.file_id)
-                bot.send_message(chat_id='-4009484644', text=order_message)
-                bot.send_message(chat_id='-4009484644', text=order_message2)
-                bot.send_photo(chat_id='-4009484644', photo=photo.file_id)
+                order_message = f"Користувач @{message.from_user.username}  хоче продати річ\nНомер замовлення: {last_order_number}\nНазва замовлення: {result}\n З ІД:  {message.from_user.id}"
+                # Sending the photo along with the message to the group
+                bot.send_photo(chat_id='-917631518', photo=photo.file_id, caption=order_message)
 
 
 
